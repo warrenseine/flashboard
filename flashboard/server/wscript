@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+
+from common import *
+
+
+def build(bld):
+  cxx = bld(features=["cxx", "cprogram"])
+
+  cxx.source = bld.path.ant_glob("src/**/*.cc").split()
+  cxx.target = "flashboard"
+
+  cxx.lib = ["pthread"]
+  cxx.staticlib = [
+    "orbit",
+    "boost_date_time",
+    "boost_program_options",
+    "boost_log",
+    "boost_log_setup",
+    "boost_filesystem",
+    "boost_signals",
+    "boost_system",
+    "boost_thread"
+  ]
+
+  cxx.includes = ["src"]
+  cxx.install_path = "${PREFIX}/apps/available/"
+
+  bld.install_as("${PREFIX}/apps/conf.d/flashboard.xml", "config.xml", chmod=660)

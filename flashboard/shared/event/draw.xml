@@ -1,0 +1,9 @@
+<event name="draw" propagate="true">
+  <property name="from x" type="short"/>
+  <property name="from y" type="short"/>
+  <property name="to x" type="short"/>
+  <property name="to y" type="short"/>
+  <property name="brush" type="short"/>
+  <property name="color" type="uint"/>
+  <property name="size" type="uint"/>
+</event>

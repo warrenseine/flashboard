@@ -1,0 +1,5 @@
+<project namespace="aerys.flashboard.shared">
+  <client directory="client/src" language="as3"/>
+  <server directory="server/src" language="c++"/>
+  <shared directory="shared"/>
+</project>

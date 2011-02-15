@@ -1,0 +1,5 @@
+<entity name="painter">
+  <property name="x" type="short"/>
+  <property name="y" type="short"/>
+  <property name="nickname" type="string"/>
+</entity>

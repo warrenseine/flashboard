@@ -1,0 +1,4 @@
+<event name="move">
+  <property name="x" type="short"/>
+  <property name="y" type="short"/>
+</event>

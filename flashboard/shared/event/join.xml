@@ -1,0 +1,3 @@
+<event name="join">
+  <property name="nickname" type="string"/>
+</event>

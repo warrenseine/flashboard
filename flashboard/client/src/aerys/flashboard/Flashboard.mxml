@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   width="758"
+			   height="580"
+			   applicationComplete="applicationCompleteHandler(event)">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import aerys.flashboard.brushes.AbstractBrush;
+			import aerys.flashboard.brushes.Eraser;
+			import aerys.flashboard.brushes.PencilBrush;
+			import aerys.flashboard.brushes.SketchyBrush;
+			import aerys.flashboard.shared.DrawEvent;
+			import aerys.flashboard.shared.Initializer;
+			import aerys.flashboard.shared.JoinEvent;
+			import aerys.flashboard.shared.JoinedEvent;
+			import aerys.flashboard.shared.MoveEvent;
+			import aerys.flashboard.shared.PainterEntity;
+			import aerys.monitor.Monitor;
+			import aerys.orbit.network.Session;
+			import aerys.orbit.network.events.AddedEvent;
+			import aerys.orbit.network.events.BindEvent;
+			import aerys.orbit.network.events.RemovedEvent;
+			
+			import aze.motion.EazeTween;
+			
+			import fastjpeg.JPEGEncoder;
+			
+			import flash.desktop.Clipboard;
+			import flash.desktop.ClipboardFormats;
+			
+			import mx.graphics.codec.PNGEncoder;
+			
+			private static const HOST		: String			= "localhost";
+			private static const PORT		: int				= 4248;
+			
+			private static const MAX_LENGTH	: int				= 75;
+			private static const MAX_ALPHA	: Number			= .5;
+			
+			private static const AUTOMUTE	: Boolean			= false;
+			
+			private static const BRUSHES	: Array				= [ {label: "Charcoal", data: new SketchyBrush()}, 
+																	{label: "Pencil", data: new PencilBrush()},
+																	{label: "Eraser", data: new Eraser()} ];
+			
+			private static const SIZES		: Array				= [ {label: "Tiny", data: 1},
+																	{label: "Small", data: 3},
+																	{label: "Normal", data: 5},
+																	{label: "Big", data: 8},
+																	{label: "Huge", data: 12} ];
+
+			private var _session			: Session			= new Session(new Initializer);
+			private var _mouse				: Point				= new Point();
+			
+			private var _marker				: Marker			= new Marker();
+			private var _id					: int				= 0;
+			private var _myPainter			: PainterEntity		= null;
+			private var _mute				: Boolean			= true;
+
+			private var _brush				: AbstractBrush		= BRUSHES[0].data;
+			private var _size				: uint				= SIZES[0].data;
+			private var _drawing			: Boolean			= false;
+			private var _bmp				: BitmapData		= null;
+			
+			private var _nameChangeTimer	: Timer				= null;
+
+			public function applicationCompleteHandler(event : Event) : void
+			{
+				initializeUI();
+				initializeInputs();
+				initializeMonitor();
+				initializeSession();
+			}
+			
+			private function initializeUI() : void
+			{
+				var nickname : String = loaderInfo.parameters["nickname"]
+										|| int(Math.random() * 0xffffff) + "";
+				
+				_bmp = new BitmapData(_component.width, _component.height, true, 0);
+				_component.addChild(new Bitmap(_bmp));
+				_component.addChild(_brush);
+				
+				_nameInput.text = nickname;
+				_marker.nickname = nickname;
+				_marker.alpha = .5;
+				
+				stage.scaleMode = StageScaleMode.NO_SCALE;
+				
+				stage.addEventListener(MouseEvent.MOUSE_DOWN, mouseDownHandler);
+				stage.addEventListener(MouseEvent.MOUSE_UP, mouseUpHandler);
+				stage.addEventListener(MouseEvent.CLICK, mouseClickHandler);
+				stage.addEventListener(MouseEvent.MOUSE_MOVE, mouseMoveHandler);
+
+				_component.addChild(new Bitmap(_bmp));
+				_component.addChild(_brush);
+				_component.addChild(_marker);
+			}
+			
+			private function initializeInputs() : void
+			{
+				stage.addEventListener(KeyboardEvent.KEY_DOWN, keyDownHandler);
+			}
+			
+			protected override function keyDownHandler(event : KeyboardEvent) : void
+			{
+				switch (event.keyCode)
+				{
+					case Keyboard.TAB :
+					case Keyboard.F1 :
+						if (contains(Monitor.monitor))
+							removeChild(Monitor.monitor);
+						else
+							addChild(Monitor.monitor);
+						break ;
+					case Keyboard.SPACE :
+						_brush.graphics.clear();
+						_brush.clear();
+						_bmp.fillRect(_bmp.rect, 0);
+						break ;
+				}
+			}
+			
+			private function initializeSession(event : Event = null) : void
+			{
+				Security.loadPolicyFile("xmlsocket://" + HOST + ":4243");
+				
+				_session.addEventListener(BindEvent.BIND, bindHandler);
+				_session.addEventListener(JoinedEvent.JOINED, joinedHandler);
+				_session.addEventListener(AddedEvent.ADDED, entityAddedHandler);
+				_session.addEventListener(RemovedEvent.REMOVED, entityRemovedHandler);
+				_session.bind(HOST, PORT);
+			}
+			
+			private function bindHandler(event : BindEvent) : void
+			{
+				join();
+			}
+			
+			private function join(event : Event = null) : void
+			{
+				_marker.nickname = _nameInput.text;
+				_session.dispatchEvent(new JoinEvent(_marker.nickname));
+			}
+			
+			private function joinedHandler(event : JoinedEvent) : void
+			{
+				if (_id)
+					return;
+
+				_id = event.painterId;
+
+				_marker.x = stage.mouseX + 5;
+				_marker.y = stage.mouseY;
+			}
+			
+			private function entityAddedHandler(event : AddedEvent) : void
+			{
+				var entity : PainterEntity = event.object as PainterEntity;
+				
+				if (event.object.id == _id)
+				{
+					_myPainter = entity;
+					_mute = false;
+				}
+				else
+				{
+					entity.addEventListener(DrawEvent.DRAW, drawHandler);
+					_component.addChild(new Painter(entity));
+				}
+			}
+			
+			private function entityRemovedHandler(event : RemovedEvent) : void
+			{
+				for (var i : int = 0; i < _component.numChildren; ++i)
+				{
+					var painter : Painter = _component.getChildAt(i) as Painter;
+					
+					if (painter && painter.entity == event.object)
+					{
+						_component.removeChild(painter);
+						return;
+					}
+				}
+			}
+			
+			private function initializeMonitor() : void
+			{
+				var m : Monitor = Monitor.monitor;
+				
+				m.watchProperties(_session.stats,
+								  ["sent", "received", "latency"],
+								  [0x00ff00, 0x0000ff, 0xff0000]);
+				
+				m.graphics.beginFill(0, .8);
+				m.graphics.drawRect(0, 0, m.width, m.height);
+			}
+			
+			private function mouseMoveHandler(event : MouseEvent) : void
+			{
+				var x : int = _mouse.x - event.stageX;
+				var y : int = _mouse.y - event.stageY;
+				var l : Number = Math.sqrt(x * x + y * y);
+				
+				_marker.x = event.stageX + 5;
+				_marker.y = event.stageY;
+				
+				_session.dispatchEvent(new MoveEvent(event.stageX, event.stageY));
+				
+				_mute ||= l >= MAX_LENGTH;
+				
+				if (_myPainter && event.buttonDown && !_mute)
+				{
+					_myPainter.dispatchEvent(new DrawEvent(_mouse.x, _mouse.y,
+														   event.stageX, event.stageY,
+														   _styleBox.selectedIndex,
+														   _colorPicker.selectedColor,
+														   _size));
+					_brush.stroke(_mouse.x, _mouse.y,
+								  event.stageX, event.stageY,
+								  _colorPicker.selectedColor,
+								  _size);
+					
+					_bmp.draw(_brush, null, _brush.transform.colorTransform, _brush.blendMode);
+					_brush.graphics.clear();
+				}
+				
+				_mouse.x = event.stageX;
+				_mouse.y = event.stageY;
+			}
+			
+			private function mouseDownHandler(event : MouseEvent) : void
+			{
+				_brush.visible = true;
+				_brush.strokeStart(stage.mouseX, stage.mouseY);
+			}
+			
+			private function mouseUpHandler(event : MouseEvent) : void
+			{
+				_brush.strokeEnd();
+				_brush.visible = false;
+				
+				_mute = false;
+			}
+			
+			private function mouseClickHandler(event : MouseEvent) : void
+			{
+				if (_myPainter && !_mute)
+				{
+					_myPainter.dispatchEvent(new DrawEvent(event.stageX, event.stageY,
+														   event.stageX + 1, event.stageY,
+														   _styleBox.selectedIndex,
+														   _colorPicker.selectedColor,
+														   _size));
+				}
+			}
+			
+			private function drawHandler(event : DrawEvent) : void
+			{
+				var brush : AbstractBrush = null;
+				
+				if (event.brush >= BRUSHES.length)
+					return ;
+
+				brush = BRUSHES[event.brush].data;
+				
+				brush.stroke(event.fromX, event.fromY, event.toX, event.toY, event.color, event.size);
+				_bmp.draw(brush, null, brush.transform.colorTransform, brush.blendMode);
+				brush.graphics.clear();
+			}
+			
+			private function nameChangeHandler(event : KeyboardEvent) : void
+			{
+				_nameChangeTimer && _nameChangeTimer.stop();
+
+				_nameChangeTimer = new Timer(1000, 1);
+				_nameChangeTimer.addEventListener(TimerEvent.TIMER_COMPLETE, join);
+				_nameChangeTimer.start();
+			}
+			
+			private function changeBrushHandler(event : Event) : void
+			{
+				_brush = BRUSHES[_styleBox.selectedIndex].data;
+			}
+			
+			private function changeSizeHandler(event : Event) : void
+			{
+				_size = SIZES[_sizeBox.selectedIndex].data;
+			}
+			
+			private function saveButtonClickHandler(event : Event, png : Boolean = true) : void
+			{
+				var bitmap : BitmapData = new BitmapData(_bmp.width, _bmp.height, false, 0xffffffff);
+				bitmap.draw(_bmp);
+
+				var picture : ByteArray = (png ? new PNGEncoder() : new JPEGEncoder(80)).encode(bitmap);
+				var reference : FileReference = new FileReference();
+				
+				var now : Date = new Date();
+				var filename : String =
+					"Flashboard " +
+					now.fullYear + "-" +
+					(now.month < 10 ? "0" : "") + now.month + "-" +
+					(now.date < 10 ? "0" : "") + now.date + " at " +
+					(now.hours < 10 ? "0" : "") + now.hours + "." +
+					(now.minutes < 10 ? "0" : "") + now.minutes + "." +
+					(now.seconds < 10 ? "0" : "") + now.seconds +
+					(png ? ".png" : ".jpg");
+
+				reference.save(picture, filename);
+			}
+		]]>
+	</fx:Script>
+	
+	<s:VGroup width="100%" height="100%"
+			  verticalAlign="bottom" horizontalAlign="center"
+			  gap="0"
+			  paddingBottom="5">
+		<mx:UIComponent width="100%" height="100%" id="_component">
+		</mx:UIComponent>
+		
+		<s:HGroup width="100%" height="32" verticalAlign="middle" horizontalAlign="center">
+			<mx:Text text="Nickname:"/>
+
+			<s:TextInput width="40%" height="80%" verticalCenter="true" id="_nameInput" keyDown="nameChangeHandler(event)"/>
+
+			<mx:ComboBox dataProvider="{BRUSHES}" id="_styleBox" close="changeBrushHandler(event)"/>
+			
+			<mx:ComboBox dataProvider="{SIZES}" id="_sizeBox" close="changeSizeHandler(event)"/>
+			
+			<mx:ColorPicker id="_colorPicker" showTextField="true" selectedColor="0"/>
+			
+			<s:Button label="Take a screenshot" id="_saveButton" click="saveButtonClickHandler(event)"/>
+		</s:HGroup>
+	</s:VGroup>
+</s:Application>

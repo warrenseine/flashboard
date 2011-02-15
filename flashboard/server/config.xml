@@ -1,0 +1,6 @@
+<application>
+  <name>Flashboard</name>
+  <port>4248</port>
+  <tickrate>1</tickrate>
+  <syncrate>15</tickrate>
+</application>

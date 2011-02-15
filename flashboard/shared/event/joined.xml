@@ -1,0 +1,3 @@
+<event name="joined">
+  <property name="painter id" type="int"/>
+</event>
