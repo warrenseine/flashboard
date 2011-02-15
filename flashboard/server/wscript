@@ -25,4 +25,4 @@ def build(bld):
   cxx.includes = ["src"]
   cxx.install_path = "${PREFIX}/apps/available/"
 
-  bld.install_as("${PREFIX}/apps/conf.d/flashboard.xml", "config.xml", chmod=660)
+  bld.install_as("${PREFIX}/apps/conf.d/flashboard.xml", "config.xml", chmod=0660)
