@@ -22,15 +22,15 @@ Getting stated
 * Create a new rule `flashboard' to redirect host port 4248 to VM port 4248
 * Start the VM
 * Open a terminal
-* Go into the demo project (`$ cd Demo/flashboard`)
-* Compile it (`$ waf configure build install --prefix=/var/orbit`)
-* Enable the application (`$ cd /var/orbit/apps/ && ln -s available enabled`)
-* Run it (`$ orbit -d /var/orbit start`)
+* Go into the demo project: `$ cd Demo/flashboard`
+* Compile it: `$ waf configure build install --prefix=/var/orbit`
+* Enable the application: `$ cd /var/orbit/apps/ && ln -s available enabled`
+* Run it: `$ orbit -d /var/orbit start`
 * Open Flash Builder
 * Create a new Flex project called `flashboard`
 * Select the folder `flashboard/client` (clone it if needed)
 * Press Next twice
-* Click *Browse* next to *Main applicaiton file* and select `Flashboard.mxml`
+* Click *Browse* next to *Main application file* and select `Flashboard.mxml`
 * Run the Flex application
 * Draw!
 
