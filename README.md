@@ -23,6 +23,7 @@ Getting stated
 * Start the VM
 * Open a terminal
 * Go into the demo project: `$ cd Demo/flashboard`
+* Compile the events / entities: `$ orbitc`
 * Compile it: `$ waf configure build install --prefix=/var/orbit`
 * Enable the application: `$ cd /var/orbit/apps/ && ln -s available enabled`
 * Run it: `$ orbit -d /var/orbit start`
