@@ -24,9 +24,8 @@ Getting stated
 * Open a terminal
 * Go into the demo project: `$ cd Demo/flashboard`
 * Compile the events / entities: `$ orbitc`
-* Compile it: `$ waf configure build install --prefix=/var/orbit`
-* Enable the application: `$ cd /var/orbit/apps/ && ln -s available enabled`
-* Run it: `$ orbit -d /var/orbit start`
+* Compile it: `$ waf configure build`
+* Test it: `$ build/debug/server/flashboard --config server/config.xml`
 * Open Flash Builder
 * Create a new Flex project called `flashboard`
 * Select the folder `flashboard/client` (clone it if needed)
@@ -35,6 +34,17 @@ Getting stated
 * Run the Flex application
 * Draw!
 
+Installation
+------------
+
+Once the application is working, you'll want to run it along with other Orbit applications. You need to install it under `/var/orbit`.
+
+* Compile it: `$ waf configure build install --prefix=/var/orbit`
+* Enable it: `$ cd /var/orbit/apps/ && ln -s available enabled`
+* Run it: `$ orbit -d /var/orbit start`
+
 Troubleshooting
 ---------------
 Make sure you have correctly set up port forwarding and that the server says `Flashboard server started on 0.0.0.0:4248`.
+
+Also, Flash will need a socket policy file on the server if you want to run it in release (but that's not what you want).
